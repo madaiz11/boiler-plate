@@ -1,0 +1,79 @@
+{
+    "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+    "assists": {
+        "actions": {
+            "source": {
+                "useSortedKeys": "on"
+            }
+        }
+    },
+    "files": {
+        "ignore": [
+            "node_modules",
+            "dist",
+            "coverage",
+            "pnpm-lock.yaml",
+            // TODO: Add Unit tests files and static directories here
+            "**/*.spec.ts"
+        ]
+    },
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 2,
+        "lineWidth": 100
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "single",
+            "semicolons": "always",
+            "trailingCommas": "all"
+        }
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "complexity": {
+                "noBannedTypes": "error",
+                "noExtraBooleanCast": "error",
+                "noForEach": "error",
+                "noUselessCatch": "error",
+                "noUselessSwitchCase": "error",
+                "useArrowFunction": "error",
+                "useLiteralKeys": "error",
+                "useOptionalChain": "error"
+            },
+            "correctness": {
+                "noConstantCondition": "error",
+                "noInvalidUseBeforeDeclaration": "error",
+                "noUnsafeOptionalChaining": "error",
+                "noUnusedImports": "error",
+                "noUnusedVariables": "error"
+            },
+            "recommended": true,
+            "style": {
+                "useBlockStatements": "error",
+                "useConst": "error",
+                "useNamingConvention": "error"
+            },
+            "suspicious": {
+                "noAsyncPromiseExecutor": "error",
+                "noCatchAssign": "error",
+                "noConfusingVoidType": "error",
+                "noConsoleLog": "error",
+                "noDoubleEquals": "error",
+                "noExplicitAny": "error",
+                "noFallthroughSwitchClause": "error",
+                "noGlobalIsNan": "error"
+            }
+        }
+    },
+    "organizeImports": {
+        "enabled": true
+    },
+    "vcs": {
+        "clientKind": "git",
+        "enabled": true,
+        "useIgnoreFile": true
+    }
+}
