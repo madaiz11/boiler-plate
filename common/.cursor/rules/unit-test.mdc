@@ -1,0 +1,76 @@
+---
+description: Unit Test Structure and Convention
+globs: **/*.test.{ts,tsx}
+---
+
+# Unit Testing Rules for Next.js (Vitest / Jest)
+
+You are an expert SDET and Next.js developer specializing in clean, maintainable, and type-safe unit tests. 
+You MUST strictly adhere to these rules to guarantee test stability and readability. 
+**STRICT REQUIREMENT:** All generated test files MUST aim for 100% code branch coverage. Do not skip edge cases.
+
+## 1. File Location & Structure Mirroring (STRICT)
+- **Centralized Testing Directory:** ALL unit test files (`.test.ts`, `.test.tsx`) MUST be placed inside the root-level `test/` directory. 
+- **Strict Mirroring:** DO NOT collocate test files inside the `src/` directory. The structure inside the `test/` folder MUST perfectly mirror the structure of the `src/` folder.
+  - *Example:* If you are testing `src/components/ProductGallery/useProductGallery.ts`, the test file MUST be created at `test/components/ProductGallery/useProductGallery.test.ts`.
+
+## 2. General Principles (AAA & Table-Driven)
+- **AAA Pattern:** Every test MUST explicitly follow the Arrange, Act, Assert pattern.
+- **Table-Driven Tests:** Use Table-Driven tests with the strictly typed `TestCase` type when testing multiple scenarios for the same function.
+- **Readability:** Keep the "Data Table" (array of test cases) at the top of the `describe` block, and the "Execution Engine" (`it.each` loop) at the bottom.
+- **No Logic in Tests:** ABSOLUTELY NO complex logic (`if/else`, loops) inside individual test cases. If a scenario requires complex branching, extract it into a standalone `it()` block.
+
+## 3. Shared Mocks & Context State
+- **Clean State:** NO global mock state bleed. Every test MUST start with a completely clean state using `beforeEach` or a dedicated `setup()` function.
+- **Factory Pattern:** Create mock data using Factory functions (e.g., `createMockUser(overrides)`) instead of hardcoding raw JSON objects inside test files.
+- **Mock Locations:** Place all mock files inside the `test/mocks/` directory. Keep domain-specific mocks grouped within this folder (e.g., `test/mocks/auth/auth.mocks.ts`).
+
+## 4. Component Testing (React Testing Library)
+- **Custom Renderers:** ALWAYS use a custom `render` function that wraps components with all necessary providers (e.g., Session, QueryClient, Theme).
+- **User-Centric Queries:** Prioritize accessible queries (`findByRole`, `findByText`, `findByLabelText`) over `data-testid` to simulate real user behavior.
+- **Isolation:** Mock Next.js Server Actions, hooks, and external API calls explicitly.
+
+## 5. Strict Code Structure Template
+When generating a unit test, you MUST use the exact structure below. ALWAYS use the absolute path alias for the `TestCase` import (e.g., `@/test/types` or your configured alias).
+
+```typescript
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import type { TestCase } from '@/test/types'; // MUST use absolute alias
+
+// 2. Mock Setup
+const setup = () => {
+  vi.clearAllMocks();
+  // Initialize shared services or default mocks here
+};
+
+describe('TargetModuleOrComponent', () => {
+  beforeEach(() => {
+    setup();
+  });
+
+  // 3. Table-Driven Data
+  const cases: TestCase[] = [
+    {
+      name: 'should handle success scenario correctly',
+      input: { id: 1 },
+      setup: () => { /* Specific mock override for this case */ },
+      expected: { success: true }
+    }
+  ];
+
+  // 4. Execution Engine
+  it.each(cases)('$name', async ({ input, setup, expected, expectedError }) => {
+    // Arrange
+    if (setup) setup();
+    
+    // Act
+    // const result = await targetFunction(input);
+
+    // Assert
+    // if (expectedError) {
+    //   expect(() => targetFunction(input)).toThrowError(expectedError);
+    // } else {
+    //   expect(result).toEqual(expected);
+    // }
+  });
+});

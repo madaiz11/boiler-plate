@@ -1,0 +1,108 @@
+---
+description: Next.js Architecture Rules - Atomic Design (Deep Detail)
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Architecture Rules: Atomic Design (Next.js App Router)
+
+Strictly adhere to the Atomic Design methodology. This architecture ensures high reusability, clear separation of concerns, and a scalable design system.
+
+---
+
+## 1. Directory Structure & File Locations
+
+The project separates Production code (`src/`) and Test code (`test/`) into distinct hierarchies.
+
+### Structure
+
+- `src/app/` — Routing & Layouts (Composition Root)
+- `src/components/atoms/` — Base elements (Single-purpose, e.g., Button, Input)
+- `src/components/molecules/` — Simple combinations (Component clusters, e.g., SearchField)
+- `src/components/organisms/` — Feature blocks (Independent & Functional, e.g., ProductCard, Navbar)
+- `src/components/templates/` — Skeleton structures (Page layouts, e.g., DashboardLayout)
+- `src/lib/` — Shared utilities (`*.util.ts`) & Barrel (`index.ts`)
+- `src/types/` — Global TypeScript definitions (`*.type.ts`) & Barrel (`index.ts`)
+- `src/hooks/` — Shared custom hooks
+- `src/i18n/` — Internationalization context & dictionaries
+
+---
+
+## 2. Layer Specifications & Implementation Standards
+
+### Layer 1: Atoms (Red)
+
+**Definition:** The smallest, indivisible building blocks of the UI.
+
+**Constraints:**
+
+- MUST NOT have business logic or data fetching.
+- MUST NOT import any other components (Except for primitive icons).
+- MUST be pure UI, driven entirely by props.
+
+**Naming:** Use generic, reusable names (e.g., Button, Badge, Avatar).
+
+### Layer 2: Molecules (Orange)
+
+**Definition:** Groups of Atoms bonded together to form a simple functional unit.
+
+**Constraints:**
+
+- Can ONLY import Atoms. NEVER import Organisms.
+- Can handle simple UI-only state (e.g., isOpen, isFocused).
+- MUST NOT perform API calls or complex side effects.
+
+**Example:** SearchField (Input Atom + Button Atom + Icon Atom).
+
+### Layer 3: Organisms (Yellow)
+
+**Definition:** Complex, distinct sections of the UI that combine Atoms and Molecules.
+
+**Constraints:**
+
+- Can import Atoms, Molecules, and other Organisms.
+- CAN contain business logic, interact with Global Stores (Zustand), or use TanStack Query.
+- MUST use the "Stateful Component Pattern" (separate UI from Logic).
+
+**Example:** ProductCard, Navbar, LoginForm.
+
+### Layer 4: Templates (Green)
+
+**Definition:** Page-level layout skeletons that arrange Organisms into a structure.
+
+**Constraints:**
+
+- MUST NOT contain any data fetching logic.
+- Acts as a blueprint; data is passed down from the Page via props or children.
+
+### Layer 5: Pages (Blue) — `app/` directory
+
+**Definition:** The entry points of the application (Next.js App Router).
+
+**Constraints:**
+
+- MUST be Server Components by default.
+- Responsible for data fetching and orchestrating Templates/Organisms.
+
+---
+
+## 3. Strict Dependency Rules (Bottom-Up)
+
+**Hierarchy:** Atoms -> Molecules -> Organisms -> Templates -> Pages.
+
+- **RULE:** Components can ONLY import from layers BELOW them.
+- **PROHIBITION:** An Atom cannot import a Molecule. A Molecule cannot import an Organism.
+
+---
+
+## 4. Coding Patterns & Logic Separation
+
+- **1:1 Stateful Pattern:** Every stateful component (Organisms+) MUST be split into `[Name].tsx` (UI) and `use[Name].ts` (Logic hook).
+- **Data Performance:** Inject `_brandKey` (for list rendering) ONLY during the data loading phase, never inside the UI render loop.
+
+---
+
+## 5. Next.js Client Boundaries
+
+- Default to Server Components.
+- Use `'use client';` ONLY if using Hooks, Context, or Event Listeners.

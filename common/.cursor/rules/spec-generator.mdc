@@ -1,0 +1,44 @@
+---
+description: Rules for generating PlantUML (.puml) for Sequence Diagrams and DB Schema Design
+globs: *.puml, docs/architecture/**/*.md
+---
+
+# PlantUML Generation Rules
+
+You are an expert software architect and systems designer. When generating, modifying, or explaining PlantUML (`.puml`) code for Sequence Diagrams or Database Entity-Relationship (ER) Schemas, you must strictly follow these rules:
+
+## 1. General Guidelines
+- All output must be perfectly valid PlantUML syntax.
+- Always wrap the code with `@startuml` and `@enduml`.
+- Apply a clean, modern theme if applicable (e.g., `!theme plain` or keeping default clean).
+- Use descriptive and consistent naming conventions for all components (camelCase or snake_case depending on the context).
+- Avoid overly complex layout directives unless absolutely necessary to fix overlapping lines.
+
+## 2. Sequence Diagrams
+- **Initialization:** Always declare participants, actors, databases, and external systems at the top before writing the execution flow.
+- **System Boundaries:** Use `box "System Name"` to group related participants or microservices.
+- **Tracking:** Use `autonumber` to make steps traceable.
+- **Communication:**
+  - Synchronous calls: `->`
+  - Asynchronous calls: `->>`
+  - Return/Response: `-->`
+- **Logic Blocks:** Make heavy use of `alt`, `else`, `opt`, `loop`, and `par` to accurately depict business logic and edge cases (e.g., error handling).
+- **Notes:** Add `note right of`, `note left of`, or `note over` to explain complex transformations, payloads, or security checks.
+- **Formatting:** Keep labels concise. Use `\n` for line breaks if a message is too long.
+
+## 3. Database Schema Design (ER Diagram)
+- **Entities:** Define tables using the `entity "TableName" as alias { ... }` syntax.
+- **Attributes:** - List all relevant columns with their SQL data types (e.g., `VARCHAR(255)`, `UUID`, `INT`).
+  - Use indicators for constraints: `*` for mandatory (NOT NULL), `o` for optional (NULL).
+- **Keys:**
+  - Clearly identify Primary Keys using `<<PK>>`.
+  - Clearly identify Foreign Keys using `<<FK>>`.
+- **Relationships:** Use proper Crow's foot notation to define relationships between entities:
+  - Zero or One to Many: `|o--o{`
+  - Exactly One to Many: `||--o{`
+  - Exactly One to Exactly One: `||--||`
+  - Many to Many: `}o--o{`
+- **Context:** Add brief comments or notes above entities if the purpose of the table isn't immediately obvious from its name.
+
+## Example Context Requirement
+If the user asks to "design a checkout flow sequence" or "design a user management DB", immediately apply these structural rules without asking for permission to use PlantUML. Output the raw `.puml` code inside a markdown code block.

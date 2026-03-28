@@ -1,0 +1,26 @@
+---
+description: React/Next.js Performance and Optimization Standards
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Performance & Optimization Protocol
+
+Evaluate code strictly for performance. DO NOT apply premature optimizations.
+
+## 1. Core React Optimization
+- **No Premature Memoization:** DO NOT blindly use `useMemo`, `useCallback`, or `React.memo()`. Apply ONLY for proven expensive computations or preventing heavy child re-renders.
+- **State Placement:** Keep state local to where it is used. Avoid unnecessary global state.
+- **Root Cause First:** Fix fundamental flaws (e.g., lifting state too high) before patching with memoization.
+
+## 2. Next.js & React Bottlenecks
+- **Dependency Arrays:** Audit `useEffect` strictly. Prevent infinite loops caused by inline objects/arrays.
+- **Assets & Routing:** Enforce Next.js `<Image />` (with `priority` for LCP) and `<Link />`.
+- **Bundle Size:** Flag heavy third-party imports. Require `next/dynamic` for non-critical heavy UI (e.g., Modals, Charts).
+- **Web Vitals (CLS):** Ensure images and dynamic blocks have explicit dimensions/aspect ratios to prevent layout shifts.
+
+## 3. Strict Output Format
+When identifying a bottleneck, you MUST output:
+- **[Location]:** File name or specific function.
+- **[Impact]:** Direct explanation of the performance hit (e.g., "Causes unnecessary re-renders on keystroke").
+- **[Solution]:** The optimized code snippet.

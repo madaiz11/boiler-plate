@@ -1,0 +1,58 @@
+---
+description: Tech Stack, Architecture, and Code Convention
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Tech Stack & Architecture Rules
+
+- **Framework**: Next.js 16 (App Router) with TypeScript.
+- **Next.js Client Boundary (STRICT)**: 
+  - ANY file that utilizes React Hooks (`useState`, `useEffect`, `useRef`, etc.), React Context, or DOM event handlers (e.g., `onClick`) MUST declare the `'use client';` directive at the absolute top of the file.
+- **Styling**: Tailwind CSS ONLY. Use `cn()` utility for dynamic classes. NO custom CSS or inline styles.
+- **Icons**: `lucide-react` ONLY.
+- **Strict Typing**: 
+  - The `any` type is STRICTLY PROHIBITED.
+  - File naming: Use `.type.ts` suffix (e.g., `product.type.ts`).
+  - Export ALL types through a barrel file at `src/types/index.ts`.
+  - Use `type` for UI props and unions. Use `interface` ONLY for OOP domain logic/contracts.
+
+# React Specific Rules & Architecture
+
+- **Data Loading & Keys (TableItemBranded - STRICT)**:
+  - DO NOT map and inject `_brandKey` during the UI render phase (this causes an O(n) performance drop on every re-render).
+  - You MUST inject the `_brandKey` into the raw data EXACTLY ONCE during the initial data loading phase, store the branded data in state, and strictly render using `key={item._brandKey}`.
+  - Raw IDs and array indices (`key={index}`) are forbidden.
+
+- **Component Architecture (Presentational / Custom Hook Pattern)**:
+  - **1. Presentational File** (`ComponentName.tsx`): Pure UI markup. Receives data and event handlers exclusively via props or by invoking its companion custom hook. NO inline state or side effects allowed.
+  - **2. Logic File** (`useComponentName.ts`): A custom hook containing ALL business logic, state (`useState`), side effects (`useEffect`), and handlers.
+  - **STRICT 1:1 Rule**: A `.tsx` file MUST contain EXACTLY ONE React component. Extract child components into separate files.
+
+- **Internationalization (i18n)**:
+  - Hardcoded strings in the UI are STRICTLY PROHIBITED.
+  - All text content MUST be retrieved via the project's i18n module/hooks (e.g., `useI18n()`) from `src/i18n/`.
+
+- **State & Side Effects**:
+  - Prefer derived state. Avoid `useEffect` unless absolutely necessary.
+  - If `useEffect` is used, meticulously verify the dependency array to prevent infinite loops.
+
+- **Data Management (SPA)**:
+  <!-- - No external APIs. Load all static mock data (JSON) and images exclusively from the `public/data/` and `public/images/` directories. -->
+  - **State Management Strategy (STRICT SEPARATION)**:
+  1. **Server State (API)**: Use **TanStack Query** ONLY. 
+     - Wrap in Custom Hooks (e.g., `useProducts.ts`).
+     - Data transformation MUST happen in the `select` function of the query.
+  2. **Global Client State**: Use **Zustand** ONLY.
+     - Store files suffix: `.store.ts`.
+     - ALWAYS use selectors to access state.
+  3. **Low-frequency/Static State**: Use **React Context** (e.g., Auth, Theme).
+  4. **Component Logic**: Use the Logic File pattern (`useComponentName.ts`) for local state.
+
+- **API & Services**:
+  - API calling logic (fetch/axios) MUST be isolated in `src/services/` or `src/api/`.
+  - Service functions MUST return clean data types defined in `.type.ts`.
+
+- **Testing**:
+  - EVERY component and shared utility MUST have a corresponding unit test following the rules in `unit-test.mdc`.
+  - The `test/` directory MUST mirror the `src/` directory structure exactly.

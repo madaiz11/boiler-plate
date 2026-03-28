@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+description: Cursor/AI Behavior Rules
+---
+
+# AI Rules & Workflow
+
+## 1. Pre-Coding & Core Behavior
+- **Architect & Optimize First:** Before writing or modifying code, briefly analyze the requested change for architectural impact and potential performance bottlenecks. Plan the approach step-by-step.
+- **Source of Truth:** Before any action, you MUST read and strictly adhere to the project-specific rules defined in:
+  1. `Tech Stack.mdc` 
+  2. `Architecture Rules.mdc` 
+  3. `Performance Protocol.mdc`
+- **Preservation:** DO NOT alter existing code/logic unless explicitly instructed.
+- **Dependencies:** Ask permission BEFORE adding packages or running install commands.
+- **Mock Data:** Must be realistic and strictly match project types/schemas.
+- **Restricted Paths:** DO NOT touch:
+  - `test/helpers/*`
+
+## 2. Post-Modification Workflow
+After ANY code change, strictly run project-specific commands:
+1. **Format/Lint:** Ensure code consistency.
+2. **Test:** Run relevant test suite. ALL affected tests MUST PASS.
+
+## 3. Test Failure Protocol
+- **Modified File Fails:** If requirements changed -> update test. If not -> fix code. DO NOT alter the test just to force a pass.
+- **Untouched File (Regression):** Fix your recent changes. DO NOT modify untouched files to silence errors.
+- **Max Retries:** Loop fixes **MAX 3 TIMES**. If still failing, STOP and ask for user guidance.

@@ -1,0 +1,69 @@
+---
+description: Next.js Architecture Rules - Feature Sliced Design (FSD)
+globs: **/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Architecture Rules: Feature Sliced Design (FSD)
+
+Strictly adhere to the Feature Sliced Design (FSD) methodology to isolate business domains and prevent circular dependencies.
+
+---
+
+## 1. The 5 Layers (Directory Structure)
+
+- **Layer 1:** `app/` -> Next.js Routing, Providers, Global CSS
+- **Layer 2:** `widgets/` -> Independent UI blocks (Header, Sidebar)
+- **Layer 3:** `features/` -> User interactions (AddToCart, UserLogin)
+- **Layer 4:** `entities/` -> Business domain models (User, Product, Order)
+- **Layer 5:** `shared/` -> Reusable UI kits (Atoms), utils, types
+
+---
+
+## 2. Layer Specifications
+
+### `shared/` (Lowest Layer)
+
+- **Content:** Generic UI components, generic hooks, and utility functions.
+- **Rule:** CANNOT import from any other layer.
+
+### `entities/`
+
+- **Content:** Business entities (e.g., ProductCard, UserAvatar) and their respective logic/state.
+- **Rule:** Can ONLY import from `'shared'`.
+
+### `features/`
+
+- **Content:** User actions that bring value (e.g., AddProductToCart, UpdateUserProfile).
+- **Rule:** Can import from `'entities'` and `'shared'`.
+
+### `widgets/`
+
+- **Content:** Composed blocks combining features and entities.
+- **Rule:** Can import from `'features'`, `'entities'`, and `'shared'`.
+
+---
+
+## 3. Strict Dependency Rules
+
+- **Unidirectional Flow:** Layers can only import from layers BELOW them.
+- **Cross-Slice Prohibition:** A slice (folder) within a layer (e.g., `features/Auth`) CANNOT import from another slice on the same layer (e.g., `features/Cart`).
+- **Public API:** You MUST import via the slice's `index.ts`. Deep imports are STRICTLY PROHIBITED.
+
+---
+
+## 4. Slice Internal Structure
+
+Every slice (except `shared`) MUST follow this structure:
+
+- **`ui/`** — React components.
+- **`model/`** — State (Zustand) and business logic (Hooks).
+- **`api/`** — Data fetching (TanStack Query).
+- **`index.ts`** — Public API (Export only what's needed).
+
+---
+
+## 5. Next.js App Router Integration
+
+- **Pages (`app/`):** Composition root. Pages fetch data and render widgets or features.
+- **Client Components:** Apply `'use client';` strictly at the leaf/feature level where interactivity is required.
