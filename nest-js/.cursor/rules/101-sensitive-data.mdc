@@ -1,0 +1,225 @@
+---
+description: Enforce type-safe identifiers via BrandedType (unique values) and StrictDataType (unique + sensitive, extends BrandedType) with mandatory sanitization in NestJS.
+globs: src/**/*.dto.ts, src/**/*.entity.ts, src/**/types/*.ts
+---
+
+# Branded Type & Sensitive Data Rules
+
+Defines a **two-tier brand pattern** for all typed values in the codebase. Both tiers are derived from a single source of truth at `src/common/types/brand.type.ts`.
+
+- **`BrandedType`** — for data that is **unique** but not sensitive (e.g. `UserId`, `OrderId`, `PlayerId`)
+- **`StrictDataType`** — extends `BrandedType` and adds `__isSensitiveData` marker for data that is **both unique and sensitive** (e.g. `HashedPassword`, `JwtToken`, `ApiKey`, `RefreshToken`)
+
+> Sensitive data MUST NOT be declared as plain `BrandedType`. It MUST extend `StrictDataType` so that Logger / Mapper / Redactor can detect it via the `__isSensitiveData` marker.
+
+---
+
+## 1. Core Definitions
+
+File: `src/common/types/brand.type.ts`
+
+```typescript
+// Tier 1: BrandedType — unique value, NOT sensitive
+export type BrandedType<T, K extends string> = T & {
+  readonly __brand: K;
+};
+
+// Tier 2: StrictDataType — unique AND sensitive
+// Extends BrandedType and adds the __isSensitiveData discriminant marker
+export type StrictDataType<T, K extends string> = BrandedType<T, K> & {
+  readonly __isSensitiveData: true;
+};
+
+// Compile-time type guard only.
+// Works at runtime ONLY when StrictDataType is a class wrapper (object with actual property).
+// Does NOT work for primitive-based StrictDataType (string | number + `as` cast) —
+// use SensitiveDataRedactor field-name pattern matching for runtime detection instead.
+export const isSensitiveData = (data: unknown): data is StrictDataType<unknown, string> =>
+  typeof data === 'object' && data !== null && (data as any).__isSensitiveData === true;
+```
+
+---
+
+## 2. Decision Matrix
+
+| Data characteristic                        | Type to use                 | Examples                                                        |
+| ------------------------------------------ | --------------------------- | --------------------------------------------------------------- |
+| Unique identifier (not sensitive)          | `BrandedType<T, K>`         | `UserId`, `OrderId`, `PlayerId`, `ItemId`                       |
+| Unique + Sensitive (leaking = security incident) | `StrictDataType<T, K>` | `HashedPassword`, `JwtToken`, `ApiKey`, `RefreshToken`, `OtpSecret` |
+| Non-unique plain value                     | primitive                   | `displayName: string`, `quantity: number`                       |
+
+**Rule of thumb:** If leaking this field into a log constitutes a security incident, it must be `StrictDataType`.
+
+---
+
+## 3. Declaring a `BrandedType` (Unique only)
+
+File: `src/common/types/user-id.type.ts`
+
+```typescript
+import { BrandedType } from '@common/types/brand.type';
+
+export type UserId = BrandedType<string, 'UserId'>;
+
+export const isUserId = (value: unknown): value is UserId =>
+  typeof value === 'string' && value.trim().length > 0;
+
+export const toUserId = (value: string): UserId =>
+  value.trim() as UserId;
+
+export const toSafeUserId = (value: unknown): UserId | unknown =>
+  isUserId(value) ? toUserId(value) : value;
+```
+
+---
+
+## 4. Declaring a `StrictDataType` (Unique + Sensitive)
+
+File: `src/common/types/hashed-password.type.ts`
+
+```typescript
+import { StrictDataType } from '@common/types/brand.type';
+
+export type HashedPassword = StrictDataType<string, 'HashedPassword'>;
+
+export const isHashedPassword = (value: unknown): value is HashedPassword =>
+  typeof value === 'string' && value.length >= 60;
+
+export const toHashedPassword = (value: string): HashedPassword =>
+  value as HashedPassword;
+
+export const toSafeHashedPassword = (value: unknown): HashedPassword | unknown =>
+  isHashedPassword(value) ? toHashedPassword(value) : value;
+
+export type ApiKey = StrictDataType<string, 'ApiKey'>;
+
+export const isApiKey = (value: unknown): value is ApiKey =>
+  typeof value === 'string' && value.trim().length >= 32;
+
+export const toApiKey = (value: string): ApiKey =>
+  value.trim() as ApiKey;
+
+export const toSafeApiKey = (value: unknown): ApiKey | unknown =>
+  isApiKey(value) ? toApiKey(value) : value;
+```
+
+`StrictDataType` inherits `__brand` from `BrandedType` — no need to redeclare it.
+
+---
+
+## 5. Implementation in DTO / Entity
+
+```typescript
+import { Transform } from 'class-transformer';
+import { IsString, IsNotEmpty, MinLength } from 'class-validator';
+import { UserId, toSafeUserId } from '@common/types/user-id.type';
+import { ApiKey, toSafeApiKey } from '@common/types/api-key.type';
+
+export class CreateOrderDto {
+  // Tier 1: BrandedType at DTO boundary
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => toSafeUserId(value))
+  readonly userId!: UserId;
+
+  // Tier 2: StrictDataType at DTO boundary
+  @IsString()
+  @MinLength(32)
+  @Transform(({ value }) => toSafeApiKey(value))
+  readonly apiKey!: ApiKey;
+}
+```
+
+DTO transforms MUST convert valid values to BrandedType/StrictDataType at the boundary. Invalid values should remain unchanged so `class-validator` can return a validation error; transform helpers MUST NOT throw or return `CommonResponse`.
+
+```typescript
+const userId = dto.userId; // already UserId after ValidationPipe + @Transform
+const apiKey = dto.apiKey; // already ApiKey after ValidationPipe + @Transform
+```
+
+```typescript
+export class AdminEntity {
+  constructor(
+    public readonly id: AdminId,                   // Tier 1: BrandedType
+    public username: string,                       // primitive (non-unique)
+    private readonly passwordHash: HashedPassword, // Tier 2: StrictDataType
+  ) {}
+}
+```
+
+---
+
+## 6. Logging & Serialization (StrictDataType only)
+
+`StrictDataType` carries `__isSensitiveData: true` as both a compile-time discriminant and a runtime marker for logger/mapper pipelines.
+
+- NEVER pass objects containing `StrictDataType` fields to `console.log`, `Logger.log`, or `JSON.stringify` directly.
+- Always route through `SensitiveDataRedactor`, which masks any field where `__isSensitiveData === true`.
+- Mapper MUST strip all `StrictDataType` fields before constructing a Response DTO.
+
+```typescript
+// BAD — passwordHash leaks
+this.logger.log({ user });
+
+// GOOD — explicit redaction
+this.logger.log(SensitiveDataRedactor.redact({ user }));
+
+// BAD — entity returned directly (sensitive fields leak)
+return user;
+
+// GOOD — mapped to Response DTO (sensitive fields stripped)
+return UserMapper.toResponse(user);
+```
+
+---
+
+## 7. Type Guard & Casting Rules
+
+Never cast primitive → BrandedType/StrictDataType directly with `as` outside the shared type module. Shared type modules MUST NOT import `CommonResponse`, error constants, or `traceId`; they only expose pure helpers:
+- DTO transform helper: returns BrandedType/StrictDataType for valid input, otherwise the original value; MUST NOT throw.
+- Type Guard: narrows an unknown value before use.
+
+```typescript
+// BAD — bypasses runtime validation
+const id = req.params.id as UserId;
+
+// GOOD — Use Case maps invalid input to ErrorResponse, then uses shared helper
+if (!isUserId(req.params.id)) {
+  return { /* Return INVALID_USER_ID ErrorResponse */ };
+}
+const id = toUserId(req.params.id);
+
+// GOOD — DTO transform helper brands valid input without throwing
+@Transform(({ value }) => toSafeUserId(value))
+readonly userId!: UserId;
+
+// GOOD — Type Guard for narrowing
+if (isUserId(value)) {
+  // value is UserId here
+}
+```
+
+Never compare a Branded/Strict value against a primitive literal without going through the factory or Type Guard:
+
+```typescript
+// BAD
+if (user.id === 'admin-001') { ... }
+
+// GOOD
+const adminId = toUserId('admin-001');
+if (user.id === adminId) { ... }
+```
+
+---
+
+## 8. Cursor Enforcement Actions
+
+- Field named `*Id`, `*Key`, `*Token`, `*Hash`, `*Secret` declared as `string` → warn to use `BrandedType` or `StrictDataType`
+- DTO fields named `*Id`, `*Key`, `*Token`, `*Hash`, `*Secret` MUST use `@Transform` with a non-throwing helper that converts valid input to BrandedType/StrictDataType
+- Field named `password*`, `token*`, `secret*`, `apiKey*`, `*Hash` declared as `BrandedType` (not `StrictDataType`) → **force** upgrade to `StrictDataType`
+- DTO transform helpers MUST return the original value on invalid input so `class-validator` handles Bad Request responses
+- Shared type modules MUST NOT import response types, error constants, or CLS context
+- `console.log` / `Logger.*` receiving an object with a `StrictDataType` field → **block** and suggest `SensitiveDataRedactor`
+- Direct cast `as UserId`, `as HashedPassword`, etc. outside shared type modules → reject and require shared helper or Type Guard
+- Comparison of Branded/Strict value against a primitive literal → require factory or Type Guard
+- Controller returning an entity that contains `StrictDataType` fields without passing through a Mapper → **block**

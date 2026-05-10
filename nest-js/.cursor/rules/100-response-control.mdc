@@ -1,0 +1,146 @@
+---
+alwaysApply: true
+description: Enforce strict space-programming response format (CommonResponse) and domain-specific error codes for all functions.
+globs: src/**/*.ts
+---
+
+# Response Control & Space Programming Error Handling
+
+You are strictly required to follow the "Space Programming" mindset. We treat errors as values, NOT exceptions.
+
+## 1. The Ultimate Response Types
+All core functions, Use Cases, and Controllers MUST return `CommonResponse<TBody, TError>`.
+DO NOT use `throw new Error()` or NestJS HTTP Exceptions inside Use Cases. Return an `ErrorResponse` instead.
+
+Success payloads exposed to HTTP MUST be Response DTOs (after `Mapper.toResponse(domain)`), not raw domain entities nor Prisma models. See `docs/specs/security/02-sanitize-response/README.md`.
+
+Assume the following types are globally available or imported from `@shared/types/response.type.ts`:
+
+```typescript
+declare const __brand: unique symbol;
+export type Brand<K, T> = K & { [__brand]: T };
+export type StatusCode = Brand<number, 'StatusCode'>;
+
+export interface BaseResponse {
+  status: StatusCode;
+  timestamp: string;
+  traceId: string;
+}
+
+export type SuccessResponse<TBody> = BaseResponse & {
+  success: true;
+  message: 'success';
+  body: TBody;
+  error?: never;
+};
+
+export type ErrorResponse<TError = unknown> = BaseResponse & {
+  success: false;
+  message: string;
+  body?: never;
+  error: TError;
+};
+
+export type CommonResponse<TBody, TError = unknown> =
+  | SuccessResponse<TBody>
+  | ErrorResponse<TError>;
+```
+
+### 2. Domain-Specific Error Constants
+Every module MUST have an error.const.ts file to define its specific error codes and messages. Magic numbers or hardcoded error strings are STRICTLY FORBIDDEN.
+
+File Location: src/modules/[module-name]/constants/[module-name]-error.const.ts
+
+```TypeScript
+// Example: player-error.const.ts
+import { createStatusCode } from '@shared/utils/response.util';
+
+export const PLAYER_ERRORS = {
+  NOT_FOUND: {
+    status: createStatusCode(404),
+    code: 'PLAYER_1001',
+    message: 'Player data not found in the system.',
+  },
+  INSUFFICIENT_FUNDS: {
+    status: createStatusCode(400),
+    code: 'PLAYER_1002',
+    message: 'Insufficient Pang Coins for this transaction.',
+  },
+} as const;
+```
+
+### 3. Use Case Implementation Rules
+Use Cases must return `Promise<CommonResponse<TResponseDto, TError>>` for success bodies.
+Do NOT throw exceptions for business logic failures.
+
+```TypeScript
+// Correct Use Case Example:
+@Injectable()
+export class DeductPangCoinUseCase {
+  constructor(
+    @Inject('IPlayerRepository') private readonly playerRepo: IPlayerRepository,
+    private readonly cls: ClsService,
+  ) {}
+
+  async execute(
+    playerId: PlayerId,
+    amount: number,
+  ): Promise<CommonResponse<PlayerResponseDto, string>> {
+    const traceId = this.cls.get<string>('x-request-id');
+    const player = await this.playerRepo.findById(playerId);
+
+    if (!player) {
+      return {
+        success: false,
+        status: PLAYER_ERRORS.NOT_FOUND.status,
+        message: PLAYER_ERRORS.NOT_FOUND.message,
+        error: PLAYER_ERRORS.NOT_FOUND.code,
+        timestamp: new Date().toISOString(),
+        traceId,
+      };
+    }
+
+    if (player.pangCoin < amount) {
+      return {
+        success: false,
+        status: PLAYER_ERRORS.INSUFFICIENT_FUNDS.status,
+        message: PLAYER_ERRORS.INSUFFICIENT_FUNDS.message,
+        error: PLAYER_ERRORS.INSUFFICIENT_FUNDS.code,
+        timestamp: new Date().toISOString(),
+        traceId,
+      };
+    }
+
+    player.deductCoins(amount);
+    await this.playerRepo.save(player);
+
+    return {
+      success: true,
+      status: createStatusCode(200),
+      message: 'success',
+      body: PlayerMapper.toResponse(player),
+      timestamp: new Date().toISOString(),
+      traceId,
+    };
+  }
+}
+```
+
+### 4. Controller Implementation Rules
+Controllers must act as a pass-through for the CommonResponse. Trace ID is created by Context Middleware from `x-request-id` and read from CLS inside Use Cases.
+
+```typescript
+// Correct Controller Example:
+@Controller('admin/players')
+export class AdminPlayerController {
+  constructor(private readonly deductPangCoinUseCase: DeductPangCoinUseCase) {}
+
+  @Post(':id/deduct')
+  async deductCoins(
+    @Param('id') id: PlayerId,
+    @Body() dto: DeductCoinDto,
+  ): Promise<CommonResponse<PlayerResponseDto, string>> {
+    return this.deductPangCoinUseCase.execute(id, dto.amount);
+  }
+}
+```

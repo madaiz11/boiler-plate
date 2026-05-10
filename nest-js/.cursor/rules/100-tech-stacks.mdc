@@ -1,0 +1,79 @@
+---
+description: Canonical tech stack for MVP Game Backoffice API. Defines every permitted runtime, framework, library, and tooling decision. All other rules reference this file as the source of truth.
+globs: src/**/*.ts, prisma/**/*
+---
+
+# Tech Stack — Canonical Reference
+
+## Runtime & Language
+
+| Item | Value | Constraint |
+|---|---|---|
+| **Node.js** | LTS | Align with NestJS-supported release |
+| **TypeScript** | Strict mode | `strictNullChecks: true`, `noImplicitAny: true` — never use `any` |
+
+## Infrastructure
+
+| Layer | Technology | Note |
+|---|---|---|
+| **Database** | PostgreSQL | Accessed only via Prisma ORM |
+| **ORM** | `prisma` + `@prisma/client` | Use Cases must NOT import Prisma directly |
+| **Cache** | Redis | Cache-Aside Pattern; used in Auth Guard for `SessionContext` — spec: `docs/specs/common/01-api-context/README.md` |
+
+## Framework — NestJS
+
+| Component | Usage |
+|---|---|
+| Controllers | HTTP layer only — thin pass-through to Use Cases |
+| Guards | Auth + RBAC (`RolesGuard`); JWT parsing happens here, not in Use Cases |
+| Interceptors / Pipes | Global validation pipe with `whitelist: true`, `forbidNonWhitelisted: true` |
+| Modules / DI | Feature-scoped modules; inject Repository interfaces, not implementations |
+| `@nestjs/config` | All env vars must go through `ConfigService` — never hardcode secrets |
+
+## Libraries
+
+| Library | Purpose | Rule |
+|---|---|---|
+| `nestjs-cls` | `RequestContext` (`x-request-id`, IP, UA) + `SessionContext` (adminId, role, permissions) | Read from `cls.get()` in Use Cases; never pass via `execute()` params |
+| `class-validator` | DTO field validation | Required on all request DTOs |
+| `class-transformer` | DTO transforms | Pair `@Transform` with BrandedType boundaries |
+
+## Type System
+
+| Category | Type | Source |
+|---|---|---|
+| Unique identifiers (IDs) | `BrandedType<T, K>` | Import from `@common/types/brand.type.ts` only |
+| Sensitive values (tokens, passwords, keys) | `StrictDataType<T, K>` | Extends `BrandedType`; cannot assign plain `string` — see `101-sensitive-data.mdc` |
+| Plain `string` | **Forbidden** for IDs / sensitive fields | Use branded types at every boundary |
+
+## Architecture Patterns
+
+| Pattern | Rule |
+|---|---|
+| **Use Case** | One class, one `execute()`. No God Services. No CQRS. |
+| **Repository** | Use Cases depend on interfaces only (`I*Repository`) |
+| **Mapper** | Prisma model ↔ Domain Entity ↔ Response DTO via `*Mapper` class |
+| **API Contract** | Return `CommonResponse<TResponseDto, TError>` — errors as values, no throws — see `100-response-control.mdc` |
+
+Full structure & naming: `100-project-strcuture.mdc`.
+
+## Testing
+
+| Item | Value |
+|---|---|
+| **Runner** | Vitest (`vi`, `describe`, `it`, `expect`) |
+| **Pattern** | AAA + Table-Driven `TestCase[]` |
+| **Location** | `test/` mirrors `src/` — no collocated test files |
+| **Coverage** | 80% minimum per function; 100% for utilities |
+
+Full conventions: `000-unit-test.mdc`.
+
+## Forbidden
+
+| What | Why |
+|---|---|
+| `$queryRaw` / `$executeRaw` with string interpolation | SQL injection risk |
+| Prisma imports in Use Cases or Domain Entities | Violates Repository abstraction |
+| `throw new HttpException` in Use Cases | Errors must be returned as values |
+| Plain `string` for branded/sensitive fields | Type safety contract |
+| Hardcoded secrets or magic error strings | Use `ConfigService` and `*.error.const.ts` |

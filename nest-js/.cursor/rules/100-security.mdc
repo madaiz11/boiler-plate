@@ -1,0 +1,129 @@
+---
+description: Enforce strict OWASP Top 10 security standards, DTO validation, data leakage prevention, and the two-tier Brand Type system (BrandedType / StrictDataType) for sensitive data in NestJS.
+globs: src/**/*.ts
+---
+# Security & OWASP Top 10 Guidelines
+
+You are an expert DevSecOps and backend developer. All code generated must strictly adhere to the OWASP Top 10 (2021) guidelines and the specific security constraints of this NestJS + Prisma project.
+
+## 1. Input Validation & Injection Prevention (OWASP A03)
+- **Strict DTOs:** All controllers MUST use Data Transfer Objects (DTOs) with `class-validator` and `class-transformer`.
+- **Validation Pipes:** Assume global validation pipes are active with `whitelist: true` and `forbidNonWhitelisted: true`. Never trust client input.
+- **No SQL/NoSQL Injection:** NEVER use Prisma's `$queryRaw` or `$executeRaw` with string interpolation. Always use Prisma's built-in query objects. If raw queries are unavoidable, strictly use parameterized inputs.
+
+## 2. Broken Access Control & IDOR Prevention (OWASP A01)
+- **Never Trust the Client ID:** When modifying resources (e.g., deducting coins), verify that the entity belongs to the correct context or that the Admin has the explicit role to modify it.
+- **Role-Based Access:** Assume endpoints require `@UseGuards(RolesGuard)` and `@Roles('SUPER_ADMIN', 'MODERATOR')` where applicable.
+- **Insecure Direct Object Reference (IDOR):** Do not allow fetching or updating records solely by an ID provided in the URL without checking ownership or administrative permissions via the `SessionContext` (CLS).
+
+## 3. Data Leakage, Cryptographic Failures & Sensitive Keys (OWASP A02 & A04)
+- **Two-Tier Brand Type System:** Follow the type rules defined in `101-sensitive-data.mdc` strictly:
+  - Unique identifiers (e.g. `UserId`, `PlayerId`) → `BrandedType<T, K>`
+  - Unique + sensitive values (e.g. `HashedPassword`, `JwtToken`, `ApiKey`) → `StrictDataType<T, K>` (extends `BrandedType`)
+  - Never use plain `string` for either category.
+- **Mapper Pattern Enforcement:** NEVER return raw Prisma Models to the controller or client. Prisma models often contain internal IDs, passwords, or soft-delete flags.
+- **Data Sanitization:** Always pass Prisma models through a Mapper (e.g., `PlayerMapper.toDomain()`) and map Domain Entities to Response DTOs before returning the `CommonResponse`.
+- **Secrets Management:** NEVER hardcode API keys, secrets, or passwords in the source code. Always use `@nestjs/config` (`ConfigService`) to retrieve environment variables.
+
+## 4. Audit Logging & Monitoring (OWASP A09 & Game Economy Specifics)
+- **Economy Transaction Logs:** Any Use Case that modifies player balances (e.g., Pang Coin, Cookies) or inventory MUST generate an audit trail.
+- **Traceability:** All error logs and audit logs must include the `traceId` and `adminId` (extracted from CLS `SessionContext`).
+- **PII Masking:** Never log sensitive user data or `StrictDataType` fields (passwords, tokens, API keys) in `console.log` or system logs. Always route through `SensitiveDataRedactor`.
+
+## 5. Identification and Authentication (OWASP A07)
+- **Token Handling:** Do not implement custom JWT parsing inside Use Cases. Authentication must be handled at the Guard/Middleware level.
+- **Context Usage:** Use Cases must retrieve the authenticated user's ID via `cls.get('session.userId')` rather than trusting an ID passed in the request body.
+
+## 6. Security Misconfiguration (OWASP A05)
+- **Error Obfuscation:** Do not leak stack traces or internal database errors to the client. All errors must be mapped to the generic `ErrorResponse` format with predefined domain codes (e.g., `PLAYER_1002`) defined in `*.const.ts` files.
+
+## 7. Example: Two-Tier Brand Type System
+
+> The canonical type definitions live in `src/common/types/brand.type.ts` (see `101-sensitive-data.mdc`).
+> Never redefine `Brand`, `BrandedType`, or `StrictDataType` inline — always import from the shared module.
+
+```typescript
+import { BrandedType, StrictDataType } from '@common/types/brand.type';
+
+// Tier 1: unique identifier — NOT sensitive
+export type AdminId = BrandedType<string, 'AdminId'>;
+export const isAdminId = (value: unknown): value is AdminId =>
+  typeof value === 'string' && value.trim().length > 0;
+export const toAdminId = (value: string): AdminId =>
+  value.trim() as AdminId;
+export const toAdminIdOrOriginal = (value: unknown): AdminId | unknown =>
+  isAdminId(value) ? toAdminId(value) : value;
+
+// Tier 2: unique AND sensitive — extends BrandedType via StrictDataType
+export type HashedPassword = StrictDataType<string, 'HashedPassword'>;
+export const isHashedPassword = (value: unknown): value is HashedPassword =>
+  typeof value === 'string' && value.length >= 60;
+export const toHashedPassword = (value: string): HashedPassword =>
+  value as HashedPassword;
+export const toSafeHashedPassword = (value: unknown): HashedPassword | unknown =>
+  isHashedPassword(value) ? toHashedPassword(value) : value;
+
+export type JwtToken = StrictDataType<string, 'JwtToken'>;
+export type ApiKey = StrictDataType<string, 'ApiKey'>;
+
+// Usage in Entity
+export class AdminEntity {
+  constructor(
+    public readonly id: AdminId,                   // Tier 1: BrandedType
+    public username: string,                       // primitive (non-unique)
+    private readonly passwordHash: HashedPassword, // Tier 2: StrictDataType — cannot accidentally assign a plain string
+  ) {}
+}
+```
+
+## 8. Example: Secure DTO Setup
+
+```typescript
+import { Transform } from 'class-transformer';
+import { IsString, IsUUID, IsInt, Min, IsNotEmpty } from 'class-validator';
+import { PlayerId, toPlayerIdOrOriginal } from '@common/types/player-id.type';
+
+export class DeductCoinDto {
+  @IsString()
+  @IsUUID(4, { message: 'Invalid player ID format' })
+  @IsNotEmpty()
+  @Transform(({ value }) => toPlayerIdOrOriginal(value))
+  readonly playerId!: PlayerId; // BrandedType at DTO boundary
+
+  @IsInt()
+  @Min(1, { message: 'Amount must be at least 1' })
+  readonly amount: number;
+}
+```
+
+## 9. Example: Secure IDOR Check in Use Case
+
+```typescript
+import { ItemId } from '@common/types/item-id.type';
+
+@Injectable()
+export class UpdateItemUseCase {
+  constructor(
+    @Inject('IItemRepository') private readonly itemRepo: IItemRepository,
+    private readonly cls: ClsService,
+  ) {}
+
+  async execute(itemId: ItemId, dto: UpdateItemDto): Promise<CommonResponse<ItemEntity, string>> {
+    const adminRole = this.cls.get('session.role');
+    const traceId = this.cls.get<string>('x-request-id');
+
+    const item = await this.itemRepo.findById(itemId);
+    if (!item) {
+      return { /* Return NOT_FOUND ErrorResponse */ };
+    }
+
+    // A01: Broken Access Control Check
+    if (adminRole !== 'SUPER_ADMIN' && item.isRestricted) {
+      // Log security event with traceId
+      return { /* Return FORBIDDEN ErrorResponse */ };
+    }
+
+    // Process update...
+  }
+}
+```
