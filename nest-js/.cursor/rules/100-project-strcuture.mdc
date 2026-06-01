@@ -1,0 +1,136 @@
+# NestJS Backoffice API - Development Rules
+
+You are an expert backend developer specializing in NestJS, TypeScript, Clean Architecture, and Prisma ORM.
+Your task is to help build a Backoffice API for a game.
+
+## Core Architecture Rules
+1. **NO CQRS:** Do NOT generate any Command, Query, CommandHandler, QueryHandler, or Event files. We are not using the CQRS pattern.
+2. **NO GOD SERVICES:** DO NOT create monolithic service files (e.g., `PlayerService` handling CRUD and business logic).
+3. **USE CASE PATTERN:** Every business feature or action MUST be a dedicated, single-purpose Use Case class.
+4. **SINGLE RESPONSIBILITY:** A Use Case class must have only ONE public method named `execute()`.
+
+## Database & Prisma Rules (STRICT)
+1. **NO PRISMA IN USE CASES:** Never inject `PrismaService` or `PrismaClient` directly into a Use Case.
+2. **REPOSITORY ABSTRACTION:** Use Cases must only interact with Repository Interfaces.
+3. **MAPPER PATTERN:** You MUST create a Mapper class/function to map Prisma generated types to pure Domain Entities, and vice versa. Domain Entities must NOT contain any Prisma dependencies.
+
+## Directory Structure
+Always organize code into feature-based modules:
+src/
+  modules/
+    [module-name]/
+      ├── controllers/          # HTTP layer
+      ├── use-cases/            # Business logic
+      ├── repositories/         # Database access interfaces & implementations
+      │   ├── interfaces/       # Repository interfaces
+      │   ├── mappers/          # Prisma Model <-> Domain Entity mappers
+      │   └── prisma/           # Prisma implementations of the repositories
+      ├── entities/             # Pure Domain models (NO Prisma imports here)
+      ├── dtos/                 # Request/Response data transfer objects
+      └── [module-name].module.ts
+
+## Naming Conventions
+- **Use Cases:** Verb + Noun + `UseCase` (e.g., `BanPlayerUseCase`). File: `action-entity.usecase.ts`
+- **Controllers:** `Admin[Entity]Controller`. File: `admin-entity.controller.ts`
+- **Repository Interface:** `I[Entity]Repository`. File: `i-entity.repository.ts`
+- **Prisma Repository:** `Prisma[Entity]Repository`. File: `prisma-entity.repository.ts`
+- **Mappers:** `[Entity]Mapper`. File: `entity.mapper.ts`
+
+## Code Generation Guidelines
+
+### 1. Domain Entities (Pure)
+- Must be pure TypeScript classes. NO database decorators or Prisma imports.
+```typescript
+// Example: src/modules/player/entities/player.entity.ts
+export class PlayerEntity {
+  constructor(
+    public readonly id: PlayerId,
+    public name: string,
+    public pangCoin: number,
+  ) {}
+
+  addPangCoin(amount: number) {
+    this.pangCoin += amount;
+  }
+}
+```
+
+### 2. Mappers & Repositories
+Repositories implement the interface and use the Mapper to return pure Entities.
+
+```TypeScript
+// Example: src/modules/player/repositories/prisma/prisma-player.repository.ts
+@Injectable()
+export class PrismaPlayerRepository implements IPlayerRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findById(id: PlayerId): Promise<PlayerEntity | null> {
+    const model = await this.prisma.player.findUnique({ where: { id } });
+    if (!model) return null;
+    return PlayerMapper.toDomain(model);
+  }
+
+  async save(entity: PlayerEntity): Promise<void> {
+    const data = PlayerMapper.toPrisma(entity);
+    await this.prisma.player.upsert({
+      where: { id: entity.id },
+      update: data,
+      create: data,
+    });
+  }
+}
+```
+
+### 3. Use Cases (Interactors)
+Inject the Repository Interface via custom providers.
+
+```TypeScript
+// Example: src/modules/player/use-cases/add-pang-coin.usecase.ts
+@Injectable()
+export class AddPangCoinUseCase {
+  constructor(
+    @Inject('IPlayerRepository')
+    private readonly playerRepo: IPlayerRepository,
+    private readonly cls: ClsService,
+  ) {}
+
+  async execute(
+    playerId: PlayerId,
+    amount: number,
+  ): Promise<CommonResponse<PlayerResponseDto, string>> {
+    const traceId = this.cls.get<string>('x-request-id');
+    const player = await this.playerRepo.findById(playerId);
+    if (!player) {
+      return {
+        success: false,
+        status: PLAYER_ERRORS.NOT_FOUND.status,
+        message: PLAYER_ERRORS.NOT_FOUND.message,
+        error: PLAYER_ERRORS.NOT_FOUND.code,
+        timestamp: new Date().toISOString(),
+        traceId,
+      };
+    }
+
+    player.addPangCoin(amount);
+    await this.playerRepo.save(player);
+
+    return {
+      success: true,
+      status: createStatusCode(200),
+      message: 'success',
+      body: PlayerMapper.toResponse(player),
+      timestamp: new Date().toISOString(),
+      traceId,
+    };
+  }
+}
+```
+
+### General Coding Standards
+Use strict TypeScript typing. Do NOT use any.
+
+Use Cases MUST follow `100-response-control.mdc`: return `CommonResponse<TBody, TError>` with HTTP-bound `TBody` as Response DTOs (`Mapper.toResponse`), and return `ErrorResponse` for business rule failures. Do NOT throw NestJS HTTP Exceptions inside Use Cases.
+
+Use Cases MUST read `traceId` from CLS RequestContext (`x-request-id`) defined in `docs/specs/common/01-api-context/README.md`. Do NOT pass `traceId` through `execute()` parameters.
+
+Use early returns to avoid deep nesting.

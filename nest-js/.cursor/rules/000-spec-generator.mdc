@@ -1,0 +1,90 @@
+---
+description: Spec generator — PlantUML/ER + docs/specs layout + markdown API outline (asks path before save)
+globs: *.puml, docs/spec/**/*.md
+---
+
+# Spec & PlantUML Generation Rules
+
+You are an expert software architect and systems designer. When generating, modifying, or explaining **markdown specs** under `docs/specs/**`, standalone **PlantUML** (`.puml`), or **ER diagrams**, strictly follow the logical sections below.
+
+## 1. Core Workflow & File Generation (Preconditions)
+- **Target Path / Filename Validation:** Before **creating or overwriting** any spec markdown under `docs/specs/`, ask the user to confirm the path: **`docs/specs/<category>/<NN>-<topic>/`** and the **filename**.
+- **Default Filename:** Use **`README.md`** for the main entry of a topic. Any other `.md` name must be **kebab-case**.
+- **Avoid Orphans:** If generating a standalone file, add or request an index `README.md` with links when relevant.
+- **Inline Output:** If the user specifies output in chat only (no file write), skip the path prompt and emit fenced code blocks only.
+
+### Category List
+This Table can be updated when user request to genearate new spec with non-existing directory
+| Category Name | Directory name | Description |
+| :--- | :--- | :--- |
+| **common** | `/common` | Common or Shared Module
+| **security** | `/security` | Security Module |
+
+## 2. Directory Structure (`docs/specs`)
+Use `docs/specs/common/01-api-context/README.md` as the reference for structure and tone.
+| Item | Convention |
+| :--- | :--- |
+| **Root** | `docs/specs/` |
+| **Category** | One **lowercase** segment (e.g., `common/`, `player/`) |
+| **Topic Folder** | `{two-digit-prefix}-{kebab-topic}/` (e.g., `01-api-context`) |
+| **Entry File** | **`README.md`** per topic; optional **`kebab-case`** sibling **`.puml`** |
+| **Full Template** | `docs/specs/<category>/<NN>-<kebab-topic>/README.md` |
+
+## 3. Markdown Spec Outline
+When authoring or extending **`README.md`** (or an approved sibling `.md`), adhere to the following structure. **Omit** subsections or appendices that do not apply (never leave empty headings). Numbering should be continuous.
+
+### 3.1 Document Front Matter
+- Start with an **`# Title`**.
+- Include **`Project:`** and **`Stack:`** lines under the title when contextually useful.
+
+### 3.2 Cross-Cutting Narrative (Optional)
+- Include context, security notes, or CLS-style narrative blocks only if strictly needed for understanding the domain.
+
+### 3.3 API Specification Block
+Open with **`## [Feature Name] API Specification`** (or equivalent), followed by:
+- **Feature:** Short name + one-line summary (Thai or English).
+- **Method / Endpoint / Description** as a bulleted list.
+
+**Subsections (use tables, prose, or fenced JSON):**
+| Subsection | Content Requirement |
+| :--- | :--- |
+| **Request headers** | Table: Key, Type, Required, Description |
+| **Path parameters** | Table: Key, Type, Required, Description |
+| **Query parameters** | Table: Key, Type, Required, Description (omit if unused) |
+| **Request body** | Content-Type (e.g., `application/json`) + **`json`** code block or field table |
+| **Response headers** | Non-default headers only (e.g., rate limits, `x-request-id`, `ETag`). **Omit** if defaults only. |
+| **Response body** | Split by HTTP status (e.g., 200 Success, 400 Error) with distinct fenced JSON blocks. |
+
+### 3.4 Appendices (Per-Endpoint)
+Add only when there is real content.
+- **Database Appendix:** Tables/models touched, important columns, constraints, idempotency notes. (Not a full ER diagram unless the doc is schema-wide).
+- **Error Appendix:** Domain error codes ↔ HTTP status, `message`, and trigger conditions.
+
+## 4. General PlantUML Guidelines
+- PlantUML syntax must be **valid** end-to-end.
+- Wrap all diagrams with **`@startuml`** / **`@enduml`**.
+- Prefer a clean theme (e.g., **`!theme plain`**).
+- **Naming:** Stick to **`camelCase`** or **`snake_case`** for aliases/technical IDs. Pick one and be consistent.
+- **Layout:** Avoid heavy `skinparam` or manual positioning unless fixing real overlap issues.
+- **Integration:** Embed diagrams within a **`plantuml`** markdown code block in `README.md` unless size dictates a sibling `.puml` file (include a one-line intro before the fence).
+
+## 5. Sequence Diagrams
+| Concern | Rule |
+| :--- | :--- |
+| **Initialization** | Declare actors, participants, databases, and externals **before** the first message. |
+| **Boundaries** | Use **`box "..."`** to group components by ownership or domain. |
+| **Steps** | Use **`autonumber`** for clear step tracking. |
+| **Calls** | Sync **`->`**, async **`->>`**, return **`-->`**. |
+| **Branches** | Use **`alt` / `else` / `opt` / `loop` / `par`** for logic flows and error handling. |
+| **Notes** | Use **`note over` / `left of` / `right of`** for non-obvious security, CLS, or payload behavior. |
+| **Labels** | Keep short. Use **`\n`** to break long lines. |
+
+## 6. ER Diagrams (Database Schema)
+- **Entities:** Declare using `entity "TableName" as alias { ... }`.
+- **Attributes:** Use SQL-style types. Mark **`*`** for NOT NULL, **`o`** for nullable optional fields.
+- **Keys:** Tag **`<<PK>>`** and **`<<FK>>`** clearly.
+- **Relationships:** Use standard Crow's foot notation: `|o--o{`, `||--o{`, `||--||`, `}o--o{`.
+- **Context:** Add one-line notes on tables if their role is not obvious from the name.
+
+## 7. Execution Context
+For requests like "design a checkout flow" or "user management DB": Apply **Sections 4-6** immediately in fenced output. When **persisting** files under `docs/specs/`, you MUST follow **Section 1** (Path/Save prompt), **Section 2** (Folder structure), and **Section 3** (Markdown outline).
