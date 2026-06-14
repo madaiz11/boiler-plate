@@ -1,8 +1,8 @@
-# 🛡️ KnightGuard Reviewer
+# 👑 RoyalGuard Reviewer
 
 **Review only. Do not fix unless explicitly asked.**
 
-Pirates ships. KnightGuard reviews.
+Pirates ships. RoyalGuard reviews.
 
 Use this skill when the user asks for:
 
@@ -34,7 +34,7 @@ Use Cursor rule `design-review.mdc` for reviewing system designs, specs, plans, 
 
 ## Lenses
 
-KnightGuard reviews with these lenses:
+RoyalGuard reviews with these lenses:
 
 ```txt
 🧱 SOLID
@@ -48,10 +48,11 @@ KnightGuard reviews with these lenses:
 ⚡ Performance
 🧠 Complexity
 🗃️ DataCompat
+📐 SpecMatch
 🤨 Weirdness
 ```
 
-Every 🐛 Defect, 📈 Big O, ⚡ Performance, 🧠 Complexity, 🗃️ DataCompat, and 🤨 Weirdness finding must include:
+Every 🐛 Defect, 📈 Big O, ⚡ Performance, 🧠 Complexity, 🗃️ DataCompat, 📐 SpecMatch, and 🤨 Weirdness finding must include:
 
 ```txt
 💬 Plain English
@@ -67,12 +68,13 @@ No raw jargon without translation.
 
 ```txt
 1. 📋 Inventory
-2. 🔍 Graph / impact sweep
-3. 🔎 Lens pass
-4. 📊 Severity assignment
-5. 📄 Report (chat summary)
-6. ✅ / 🛑 Binary verdict
-7. 📁 HTML export (reviewed repo — mandatory before done)
+2. 📐 Spec alignment (overview flow vs spec)
+3. 🔍 Graph / impact sweep
+4. 🔎 Lens pass
+5. 📊 Severity assignment
+6. 📄 Report (chat summary)
+7. ✅ / 🛑 Binary verdict
+8. 📁 HTML export (reviewed repo — mandatory before done)
 ```
 
 ---
@@ -99,6 +101,7 @@ Inventory must identify:
 - Entry symbols:
 - Public API touched:
 - Hot paths:
+- Collection members (if scope is a set):
 - Review limits:
 ```
 
@@ -108,6 +111,89 @@ Rules:
 - Comment on unchanged code only when changed code introduces or exposes the issue.
 - Do not perform a full-repo audit unless the user explicitly asks.
 - If scope is incomplete, state review limits clearly.
+- If the scope names a **collection** (`every`/`all`/`each`/`per <thing>`, a plural noun, or a glob), enumerate the concrete members from the project (codegraph / search / config / registry / dir listing) **with file:line evidence before reviewing** — never guess the set. Each member is its own review unit (enables parallel multitask). See `romano-method` Phase 1a. If you cannot enumerate from evidence, state it as a review limit and ask for the source.
+
+---
+
+# 1b. 📐 Spec Alignment (Overview Flow Match)
+
+Confirm the **overview flow** of the changed code matches its governing spec **before** the lens pass. Run this mode whenever a spec governs the changed behavior.
+
+## Step 1 — Ask for the spec
+
+Ask the user which spec(s) to align against:
+
+- spec file path(s)
+- ticket / PR / story link
+- doc name or section
+
+If the user names a spec, use it and skip to Step 3.
+
+## Step 2 — Auto-locate spec (user cannot answer)
+
+If the user does not know or cannot point to a spec, locate it with a romano-style anchor scan.
+
+### Derive Tier-1 anchor
+
+From the Inventory scope, pick the strongest concrete anchor (same idea as `romano-method` Phase 1 — anchor first, never broad-grep the whole repo). If the anchor is a **collection**, expand it to concrete members from evidence first (`romano-method` Phase 1a) — never treat "all/every X" as one anchor or guess its members:
+
+| Source        | Anchor candidate                          |
+| ------------- | ----------------------------------------- |
+| Feature/story | domain term, feature name, user language  |
+| Symbol        | changed function/class/route name         |
+| Config/route  | route path, config key, event name        |
+| Ticket        | ticket id / PR title slug                 |
+
+### Scan for spec docs
+
+Use codegraph / semantic search first, then targeted grep, to find spec files:
+
+- file types: `.md`, `.html` (also `.mdx`, `.adoc` if present)
+- match on **anchor + context + sub-context** — same primary anchor AND same surrounding domain/section the changed code belongs to
+- prefer docs under `docs/`, `spec/`, `specs/`, `.cursor/`, `design/`, `rfc/`, wiki exports
+- rank by anchor proximity: title/heading match > anchor in body > sibling sub-context only
+
+### Report candidates
+
+```md
+## Spec Candidates
+
+- Anchor: <primary anchor>
+- Context / sub-context: <domain> / <section>
+- Found:
+  - `path` — match: title | heading | body | sibling
+- Selected spec:
+- Confidence: high | medium | low
+```
+
+If no spec is found, state it and continue the review **without** spec alignment — note this as a review limit, not a finding.
+
+## Step 3 — Compare overview flow
+
+Build the expected overview flow from the spec, then compare to the actual changed flow.
+
+```md
+## Spec Alignment
+
+- Spec: <path / link>
+- Expected flow: A → B → C
+- Actual flow (changed code): A → B → X
+- Match: full | partial | mismatch
+- Gaps (in spec, missing in code):
+- Out-of-spec additions (in code, not in spec):
+- Confidence:
+```
+
+Rules:
+
+- Compare **overview/contract** level, not line-by-line style.
+- Step in spec missing from code = **gap**.
+- Step in code not in spec = **out-of-spec addition** — flag; may be intentional, ask if unclear.
+- Order/contract mismatch on a hot path escalates severity.
+
+## Findings
+
+Each gap or mismatch becomes a 📐 SpecMatch finding (see Lens Pass + Finding Format). Default severity from impact; escalate +1 on hot path per global rules. Missing/unfound spec is a **review limit**, not a finding.
 
 ---
 
@@ -164,6 +250,7 @@ Review with all lenses.
 | ⚡   | Performance | N+1, sync I/O hot path, no pagination, chatty RPC, UI main-thread block            |
 | 🧠   | Complexity  | too many duties, long functions, misleading names, hidden mutation                 |
 | 🗃️   | DataCompat  | migration/versioning safety, backward compatibility, obsolete-data handling        |
+| 📐   | SpecMatch   | overview/contract flow matches governing spec; no missing, added, or reordered steps |
 | 🤨   | Weirdness   | **zero-tolerance** — mandatory pass; any unjustified odd code in diff blocks merge |
 
 **🤨 Weirdness is important++:** scan every changed file/symbol. Confirmed weirdness in scope is **always blocking** (minimum 🟡). No “we’ll clean later,” no 🔵 waiver for “harmless” smells.
@@ -213,7 +300,7 @@ Severity meanings:
 
 # 5. ✅ Binary Verdict
 
-KnightGuard uses a binary verdict.
+RoyalGuard uses a binary verdict.
 
 | Verdict        | When                                               |
 | -------------- | -------------------------------------------------- |
@@ -238,7 +325,7 @@ Verdict summary must be one of:
 Use this format:
 
 ```md
-# 🛡️ KnightGuard Review
+# 👑 RoyalGuard Review
 
 |                |                                                                      |
 | -------------- | -------------------------------------------------------------------- |
@@ -259,7 +346,7 @@ Use this format:
 
 ## 🔎 Findings
 
-### KG-1 🟠 🔒 Security — [title]
+### RG-1 🟠 🔒 Security — [title]
 
 |                      |                        |
 | -------------------- | ---------------------- |
@@ -305,7 +392,7 @@ Read [REFERENCE.md](REFERENCE.md) for HTML skeleton, section IDs, and CSS classe
 ```txt
 .cursor/code-review-report/<timestamp-story>/
   index.html
-  assets/knightguard.css
+  assets/royalguard.css
 ```
 
 **Folder name:** `YYYYMMDD-HHMMSS-kebab-case-slug` (e.g. `20260604-143022-skip-sms-renew-gate`).
@@ -324,7 +411,7 @@ Each review run creates a **new folder** (never overwrite a prior report).
 ## Export actions
 
 1. Create `.cursor/code-review-report/<timestamp-story>/`.
-2. Copy `assets/knightguard.css` from this skill (`skills/knightguard-reviewer/assets/knightguard.css`) into the report `assets/` folder.
+2. Copy `assets/royalguard.css` from this skill (`skills/royalguard-reviewer/assets/royalguard.css`) into the report `assets/` folder.
 3. Write `index.html` with the same content as the chat report (inventory, verdict, severity counts, every finding, graph notes, clean passes).
 4. Do **not** write parallel `.md` report files in that folder (HTML only).
 
@@ -337,7 +424,7 @@ Each review run creates a **new folder** (never overwrite a prior report).
 Example:
 
 ```txt
-🛡️ KnightGuard — 🛑 Not approve (2 blocking)
+👑 RoyalGuard — 🛑 Not approve (2 blocking)
 Report: /path/to/repo/.cursor/code-review-report/20260604-143022-my-feature/index.html
 ```
 
@@ -348,13 +435,13 @@ Report: /path/to/repo/.cursor/code-review-report/20260604-143022-my-feature/inde
 Heading:
 
 ```md
-### KG-{n} {severity} {lens} {Name} — {title}
+### RG-{n} {severity} {lens} {Name} — {title}
 ```
 
 Example:
 
 ```md
-### KG-1 🟠 🔒 Security — Missing authorization on customer export
+### RG-1 🟠 🔒 Security — Missing authorization on customer export
 ```
 
 Finding fields:
@@ -365,7 +452,7 @@ Finding fields:
 | ⚠️ Issue           |                            yes | what is wrong                                  |
 | 🔍 Evidence        |                            yes | code, graph, diff, test, or runtime signal     |
 | ❓ Why this exists |                            yes | likely intent today, or state unknown clearly  |
-| 💬 Plain English   | required for 🐛 📈 ⚡ 🧠 🗃️ 🤨 | explain impact simply                          |
+| 💬 Plain English   | required for 🐛 📈 ⚡ 🧠 🗃️ 📐 🤨 | explain impact simply                       |
 | 🔧 Fix             |                            yes | concise fix direction, not full implementation |
 
 Security findings must include OWASP tag when applicable.
@@ -373,7 +460,7 @@ Security findings must include OWASP tag when applicable.
 Example:
 
 ```md
-### KG-1 🟠 🔒 Security — Missing tenant authorization [OWASP A01 Access]
+### RG-1 🟠 🔒 Security — Missing tenant authorization [OWASP A01 Access]
 
 |                      |                                                                                     |
 | -------------------- | ----------------------------------------------------------------------------------- |
@@ -463,6 +550,26 @@ Always review this lens when changed code touches:
 
 Use `REFERENCE.md` for severity thresholds and expected handling levels.
 
+## 📐 SpecMatch (Overview Flow vs Spec)
+
+Run the Spec Alignment step (section 1b) before flagging here.
+
+Flag when changed code's overview flow diverges from the governing spec:
+
+- spec step missing in code (gap)
+- code step not in spec (out-of-spec addition)
+- reordered / wrong-contract step vs spec
+- spec-required guard, validation, or side effect absent
+
+Rules:
+
+- Compare contract/overview level, not style.
+- Severity from impact; escalate +1 on hot path.
+- Unfound spec = review limit, not a finding.
+- Out-of-spec addition may be intentional — flag and ask, do not auto-fail without confirming intent.
+
+Must include plain English.
+
 ## 🤨 Weirdness (จุดเอ๊ะ — important++, zero-tolerance)
 
 **Policy:** no unjustified odd code may ship in the reviewed diff. Weirdness is a **mandatory** lens — not optional, not “nice to have.”
@@ -542,8 +649,8 @@ Do not require tests for every review unless user asks.
 | Cursor Rule | `design-review.mdc`  | review system designs, specs, plans, migrations      |
 | Cursor Rule | `task-execution.mdc` | execute approved task lists one task at a time       |
 
-KnightGuard does not replace design review.
-KnightGuard reviews code/diffs.
+RoyalGuard does not replace design review.
+RoyalGuard reviews code/diffs.
 `design-review.mdc` reviews proposals before code.
 
 ---

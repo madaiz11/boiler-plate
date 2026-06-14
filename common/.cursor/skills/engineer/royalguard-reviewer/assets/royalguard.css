@@ -1,0 +1,254 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #f8fafc;
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #1e293b;
+  line-height: 1.6;
+}
+
+.rg-nav {
+  background: #4c1d95;
+  color: #fff;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.rg-nav a {
+  color: #c4b5fd;
+  text-decoration: none;
+}
+
+.rg-nav a:hover {
+  text-decoration: underline;
+}
+
+.rg-badge {
+  background: #6d28d9;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+.rg-doc {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 30px 24px 60px;
+}
+
+.doc-header {
+  border-bottom: 3px solid #4c1d95;
+  padding-bottom: 16px;
+  margin-bottom: 28px;
+}
+
+.doc-header h1 {
+  margin: 0 0 8px;
+  color: #4c1d95;
+  font-size: 1.75rem;
+}
+
+.doc-header .meta {
+  color: #64748b;
+  margin: 0;
+  font-size: 0.95em;
+}
+
+section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+section h2 {
+  margin: 0 0 12px;
+  color: #334155;
+  font-size: 1.15rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.verdict-banner {
+  padding: 16px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.verdict--approve {
+  background: #e8f8f5;
+  border-left: 5px solid #2ecc71;
+  color: #166534;
+}
+
+.verdict--not-approve {
+  background: #fde8e8;
+  border-left: 5px solid #e53e3e;
+  color: #991b1b;
+}
+
+.count-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.count-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: center;
+}
+
+.count-card .label {
+  font-size: 0.85em;
+  color: #64748b;
+}
+
+.count-card .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.count-card.sev-critical .value {
+  color: #dc2626;
+}
+
+.count-card.sev-high .value {
+  color: #ea580c;
+}
+
+.count-card.sev-medium .value {
+  color: #ca8a04;
+}
+
+.count-card.sev-low .value {
+  color: #2563eb;
+}
+
+.count-card.sev-info .value {
+  color: #16a34a;
+}
+
+.meta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.meta-table th,
+.meta-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.meta-table th {
+  background: #f1f5f9;
+  width: 28%;
+  color: #475569;
+}
+
+.finding-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.finding-card h3 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.finding-card.sev-critical {
+  border-left: 4px solid #dc2626;
+  background: #fef2f2;
+}
+
+.finding-card.sev-high {
+  border-left: 4px solid #ea580c;
+  background: #fff7ed;
+}
+
+.finding-card.sev-medium {
+  border-left: 4px solid #ca8a04;
+  background: #fffbeb;
+}
+
+.finding-card.sev-low {
+  border-left: 4px solid #2563eb;
+  background: #eff6ff;
+}
+
+.finding-card.sev-info {
+  border-left: 4px solid #16a34a;
+  background: #f0fdf4;
+}
+
+.field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  margin-top: 8px;
+}
+
+.field-table th,
+.field-table td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.field-table th {
+  background: #f8fafc;
+  width: 22%;
+  color: #64748b;
+  font-weight: 600;
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+}
+
+pre {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.clean-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.clean-list li {
+  margin-bottom: 6px;
+}
+
+.rg-footer {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 24px 40px;
+  color: #64748b;
+  font-size: 0.9em;
+}

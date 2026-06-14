@@ -1,4 +1,4 @@
-# 🛡️ KnightGuard Reference
+# 👑 RoyalGuard Reference
 
 Lookup when assigning severity during lens pass. Main workflow: [SKILL.md](./SKILL.md).
 
@@ -19,7 +19,7 @@ Pick **one cell** per finding. Multi-lens → **highest** severity. Escalate **+
 | 🔁 **Loop**        | **Deadly loop** on prod worker, API, or UI main thread (no exit)           | Unbounded retry/poll on hot path; deadly loop confirmed                                    | `while`/retry missing cap warm; possible cycle — exit unclear          | Bounded loop but unclear exit            | Retry has max + backoff + idempotent          |
 | 📈 **BigO**        | O(2ⁿ)+ or unbounded memory on request path                                 | O(n²)+ on hot API (nested loop orders × items)                                             | O(n²) warm or O(n) with very large typical n                           | O(n) on small bounded n                  | Optimal approach (hash map, single pass)      |
 | ⚡ **Performance** | Sync block critical path; load-all OOM at prod scale                       | N+1 hot API; chatty RPC in request; main-thread UI block                                   | N+1 export/report; missing pagination; no cache on heavy work          | Micro-optimization                       | Batching, pagination, cache done right        |
-| 🧠 **Complexity**  | >150 lines or >5 duties touching **auth/money**                            | >80 lines or >4 duties hot path; hidden side effect on `get*`                              | >50 lines or >5 branches; misleading names on changed API              | Long fn but readable                     | Small focused fn — good example               |
+| 🧠 **Complexity**  | >150 lines or >5 duties touching **auth/money**                            | >80 lines or >4 duties hot path; hidden side effect on `get*`                              | >50 lines or >5 branches; misleading names on changed API             | Long fn but readable                     | Small focused fn — good example               |
 | 🗃️ **DataCompat** | New code corrupts or misreads old-version data causing data loss/wrong state | No backward-compatible path and no safe skip+log on hot path; batch/request crashes on obsolete data | Partial compatibility works but important old-version shapes fail; skip exists but weak logging/observability | Safe skip+log only, no compatibility path | Old data normalized/mapped to near-new behavior (full parity not required) |
 | 🤨 **Weirdness** | Weirdness on auth/money/state path masks or bypasses correct checks | Confirmed weirdness on hot path (useless caller, nested fn, no-op wrapper, intent mismatch) | **Default:** any confirmed weirdness in changed code — must fix before merge | **Not used** — do not waive weirdness as Low | Changed scope scanned; no weirdness signals |
 
@@ -133,7 +133,7 @@ Skip O(n) nitpick on fixed arrays ≤10. Focus on scale product actually hits.
 ### Confirmed defect
 
 ```markdown
-### KG-1 🟠 🐛 Defect — Validation bypass [Confirmed]
+### RG-1 🟠 🐛 Defect — Validation bypass [Confirmed]
 
 |                      |                                                                         |
 | -------------------- | ----------------------------------------------------------------------- |
@@ -147,7 +147,7 @@ Skip O(n) nitpick on fixed arrays ≤10. Focus on scale product actually hits.
 ### Possible defect
 
 ```markdown
-### KG-2 🟡 🐛 Defect — Nullable return not guarded [Possible — verify]
+### RG-2 🟡 🐛 Defect — Nullable return not guarded [Possible — verify]
 
 |                      |                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------- |
@@ -161,15 +161,15 @@ Skip O(n) nitpick on fixed arrays ≤10. Focus on scale product actually hits.
 ### Big O · Performance · Loop
 
 ```markdown
-### KG-3 🟠 📈 BigO — Nested filter on orders
+### RG-3 🟠 📈 BigO — Nested filter on orders
 
 | 💬 **Plain English** | 100 orders × 50 items → thousands of comparisons — list slows as history grows. |
 
-### KG-4 🟡 ⚡ Performance — N+1 load users
+### RG-4 🟡 ⚡ Performance — N+1 load users
 
 | 💬 **Plain English** | 500 rows → 500 DB trips — exports time out on real data. |
 
-### KG-5 🟠 🔁 Loop — Deadly loop (no exit)
+### RG-5 🟠 🔁 Loop — Deadly loop (no exit)
 
 | 💬 **Plain English** | Worker spins forever waiting — never moves to next job. |
 | 🔍 **Evidence** | 🔁 `pollUntilReady → fetchStatus → pollUntilReady` — no break on 404. |
@@ -231,10 +231,10 @@ Write before the review session ends. Path is always under the **reviewed code r
 ```txt
 <git-root>/.cursor/code-review-report/<YYYYMMDD-HHMMSS-story-slug>/
   index.html
-  assets/knightguard.css
+  assets/royalguard.css
 ```
 
-Copy CSS from `skills/knightguard-reviewer/assets/knightguard.css` in the skill package.
+Copy CSS from `skills/royalguard-reviewer/assets/royalguard.css` in the skill package.
 
 ### Page skeleton (`index.html`)
 
@@ -244,22 +244,22 @@ Copy CSS from `skills/knightguard-reviewer/assets/knightguard.css` in the skill 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KnightGuard — [story slug]</title>
-  <link rel="stylesheet" href="assets/knightguard.css" />
+  <title>RoyalGuard — [story slug]</title>
+  <link rel="stylesheet" href="assets/royalguard.css" />
 </head>
 <body>
-  <nav class="kg-nav">
-    <span class="kg-badge">KnightGuard Review</span>
+  <nav class="rg-nav">
+    <span class="rg-badge">RoyalGuard Review</span>
     <span>[timestamp-story]</span>
   </nav>
-  <main class="kg-doc">
+  <main class="rg-doc">
     <header class="doc-header">
-      <h1>🛡️ KnightGuard Review</h1>
+      <h1>👑 RoyalGuard Review</h1>
       <p class="meta">Scope: … · Repo: … · Generated: …</p>
     </header>
     <!-- sections — see IDs below -->
   </main>
-  <footer class="kg-footer">KnightGuard — review only, no auto-fix</footer>
+  <footer class="rg-footer">RoyalGuard — review only, no auto-fix</footer>
 </body>
 </html>
 ```
@@ -272,15 +272,15 @@ Copy CSS from `skills/knightguard-reviewer/assets/knightguard.css` in the skill 
 | `#summary` | 2–4 sentence summary; review limits |
 | `#severity-counts` | `.count-grid` with `.count-card` per severity (critical/high/medium/low/info) |
 | `#inventory` | `.meta-table`: scope, changed files, entry symbols, public API, hot paths, limits |
-| `#findings` | One `.finding-card` per KG-n (classes: `sev-critical`, `sev-high`, `sev-medium`, `sev-low`, `sev-info`) |
+| `#findings` | One `.finding-card` per RG-n (classes: `sev-critical`, `sev-high`, `sev-medium`, `sev-low`, `sev-info`) |
 | `#graph-notes` | Bug sweep symbols; cycle chains or "none" |
 | `#clean-passes` | `.clean-list` of lenses with no material issues |
 
 ### Finding card structure
 
 ```html
-<article class="finding-card sev-high" id="kg-1">
-  <h3>KG-1 🟠 🔒 Security — [title]</h3>
+<article class="finding-card sev-high" id="rg-1">
+  <h3>RG-1 🟠 🔒 Security — [title]</h3>
   <table class="field-table">
     <tr><th>Where</th><td><code>path:line</code> (<code>symbol</code>)</td></tr>
     <tr><th>Issue</th><td>...</td></tr>
@@ -307,7 +307,7 @@ When there are no findings, `#findings` contains `<p>No blocking findings.</p>`.
 
 ## 🔗 Workflow boundary
 
-KnightGuard reviews code, diffs, changed files, and changed symbols.
+RoyalGuard reviews code, diffs, changed files, and changed symbols.
 
 Use:
 
